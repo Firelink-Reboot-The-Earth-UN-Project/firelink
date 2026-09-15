@@ -1,313 +1,393 @@
-# FireLink — Run Guide
+# FireLink - Wildfire Evacuation Intelligence Platform
 
-Wildfire evacuation intelligence platform. Backend (FastAPI + Kafka + Pinecone + OpenAI/Anthropic agents) + frontend (Next.js dashboard + chat).
+## 🚨 Quick Start (5 minutes)
 
-This is the **monorepo run guide**. See `backend/README.md` and `frontend/README.md` for component-level details.
+**Make sure both backend AND frontend are running for the app to work!**
 
----
-
-## Quick run (3 terminals)
-
-Assumes first-time setup done (see below). For demo / fast restart:
+### Terminal 1: Start Backend
 
 ```bash
-# Terminal 1 — backend stack (rebuild + start)
-cd backend
-make up-build
-
-# Terminal 2 — public tunnel for backend
-ngrok http 8000
-# copy the https://xxxx.ngrok-free.app URL → paste into frontend/.env.local
-#   NEXT_PUBLIC_API_URL=https://xxxx.ngrok-free.app
-
-# Terminal 3 — frontend:
-cd frontend
-npm run dev
+cd firelink/backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
----
+✅ Backend ready: http://localhost:8000/docs
 
-## Repo layout
-
-```
-Downloads/
-├── backend/          # FastAPI, Kafka, agents, MCP server (docker-compose)
-├── frontend/         # Next.js 16, TypeScript, Tailwind, Leaflet
-└── README.md         # this file
-```
-
----
-
-## Prerequisites
-
-| Tool | Version | Install |
-|---|---|---|
-| Docker Desktop | running | https://www.docker.com/products/docker-desktop |
-| Docker Compose v2 | bundled with Docker Desktop | — |
-| Node.js | ≥ 20 | `nvm install 20` or https://nodejs.org |
-| npm | bundled with Node | — |
-| Python 3 | ≥ 3.10 (only for `make sms`, `make test`, `make ingest` host-side) | `brew install python` |
-| make | preinstalled on macOS | — |
-
-Verify:
+### Terminal 2: Start Frontend
 
 ```bash
-docker --version
-docker compose version
-node --version
-npm --version
-python3 --version
+cd firelink/frontend
+npm install
+npm start
+```
+
+✅ Frontend ready: http://localhost:3000
+
+---
+
+## 📋 Team Overview
+
+This is a **24-hour hackathon MVP** for a wildfire evacuation intelligence platform. The project is split into **Backend** and **Frontend** teams.
+
+### What is FireLink?
+
+FireLink helps communities respond to wildfires by:
+
+- **Real-time incident reporting** - Users report fires, blocked roads, smoke, etc.
+- **Risk scoring** - Computes evacuation danger based on hazard proximity
+- **Smart routing** - Calculates safest evacuation routes to shelters
+- **Interactive visualization** - Shows all hazards and routes on a live map
+
+---
+
+## 👥 Team Structure
+
+### 🔧 Backend Team (Python/FastAPI)
+
+**Focus**: API endpoints, risk engine, routing logic, database
+
+**Key Files**:
+
+- `firelink/backend/app/main.py` - Main API app
+- `firelink/backend/app/services/risk_engine.py` - Risk scoring algorithm
+- `firelink/backend/app/services/routing_engine.py` - Route computation
+- `firelink/backend/app/routers/` - API endpoints
+
+**Responsibilities**:
+
+- Implement risk scoring algorithm improvements
+- Add real OSM routing (replace mock routes)
+- Add WebSocket support for live updates
+- Connect to real fire/hazard data sources
+- Performance optimization
+
+**API Docs**: http://localhost:8000/docs (Swagger UI)
+
+### 🎨 Frontend Team (React/TypeScript)
+
+**Focus**: UI/UX, map visualization, user interactions
+
+**Key Files**:
+
+- `firelink/frontend/src/components/` - React components
+- `firelink/frontend/src/api/client.ts` - Backend communication
+- `firelink/frontend/src/App.tsx` - Main app logic
+
+**Responsibilities**:
+
+- Improve map styling and interactivity
+- Add animations and transitions
+- Enhance form UX and validation
+- Add real-time updates with WebSockets
+- Responsive design for mobile
+- Accessibility improvements
+
+---
+
+## 🗂️ Project Structure
+
+```
+firelink/
+├── README.md                 ← Main project guide
+├── .gitignore
+├── backend/                  ← Python/FastAPI backend
+│   ├── README.md            ← Backend setup & API docs
+│   ├── requirements.txt      ← Python dependencies
+│   └── app/
+│       ├── main.py          ← FastAPI app
+│       ├── models.py        ← Database models
+│       ├── schemas.py       ← Pydantic schemas
+│       ├── database.py      ← DB configuration
+│       ├── routers/         ← API endpoints
+│       │   ├── reports.py
+│       │   ├── routing.py
+│       │   ├── risk.py
+│       │   └── layers.py
+│       ├── services/        ← Business logic
+│       │   ├── risk_engine.py
+│       │   ├── routing_engine.py
+│       │   └── data_loader.py
+│       └── seed/            ← Initial data
+│           ├── shelters.json
+│           ├── fire_points.json
+│           └── mock_reports.json
+└── frontend/                 ← React/TypeScript frontend
+    ├── README.md            ← Frontend setup & guide
+    ├── package.json         ← Node dependencies
+    ├── public/
+    │   └── index.html
+    └── src/
+        ├── App.tsx          ← Main component
+        ├── components/      ← React components
+        ├── api/             ← Backend client
+        └── types/           ← TypeScript types
 ```
 
 ---
 
-## API keys you need
+## 🔌 API Endpoints (Quick Reference)
 
-Create `backend/.env` (already gitignored — never commit):
+| Method  | Endpoint           | Purpose                    |
+| ------- | ------------------ | -------------------------- |
+| `GET`   | `/health`          | Health check               |
+| `POST`  | `/reports`         | Create incident report     |
+| `GET`   | `/reports`         | List all reports           |
+| `GET`   | `/reports/{id}`    | Get single report          |
+| `PATCH` | `/reports/{id}`    | Update report (resolve)    |
+| `GET`   | `/layers/shelters` | Get evacuation shelters    |
+| `GET`   | `/layers/fire`     | Get fire reports (GeoJSON) |
+| `GET`   | `/risk/grid`       | Get risk heatmap data      |
+| `POST`  | `/route`           | Compute evacuation route   |
 
-```env
-OPENAI_API_KEY=sk-proj-...
-ANTHROPIC_API_KEY=sk-ant-...
-PINECONE_API_KEY=pcsk-...
-PINECONE_INDEX_NAME=rte-wildfire-data
-```
-
-Where each is used:
-
-- `OPENAI_API_KEY` — recommendation agent (`gpt-4o-mini`) + Pinecone embeddings during ingest
-- `ANTHROPIC_API_KEY` — Help Agent (Claude SMS replies + chat)
-- `PINECONE_API_KEY` + `PINECONE_INDEX_NAME` — RAG vector store for wildfire knowledge PDFs
+**Full API Docs**: http://localhost:8000/docs
 
 ---
 
-## First-time setup
+## 📊 Database Schema
 
-Run from `Downloads/backend/`:
+### Report Table
+
+```python
+Report(
+    id: int,
+    report_type: "fire_seen" | "blocked_road" | "heavy_smoke" | "assistance_needed" | "power_outage",
+    latitude: float,
+    longitude: float,
+    note: str (optional),
+    created_at: datetime,
+    is_resolved: bool
+)
+```
+
+### Shelter Table
+
+```python
+Shelter(
+    id: int,
+    name: str,
+    latitude: float,
+    longitude: float,
+    capacity: int,
+    description: str
+)
+```
+
+---
+
+## 🎯 Key Features & Implementation
+
+### Risk Scoring Algorithm
+
+Computes risk (0.0 to 1.0) based on proximity to:
+
+- **Fires** (2km radius) - Weight: 1.0
+- **Blocked Roads** (1.5km radius) - Weight: 0.8
+- **Smoke** (1km radius) - Weight: 0.5
+
+Uses **Haversine distance** formula for geographic calculations.
+
+**Location**: `firelink/backend/app/services/risk_engine.py`
+
+### Routing Algorithm (MVP)
+
+Current: Mock routes between start → nearest shelter
+
+Future improvements:
+
+- Real OSM road networks (NetworkX/OSMnx)
+- Dijkstra's algorithm for optimal paths
+- Multi-shelter evacuation planning
+
+**Location**: `firelink/backend/app/services/routing_engine.py`
+
+### Frontend Map
+
+Built with **Leaflet.js** displaying:
+
+- Shelter markers (blue)
+- Incident reports (colored by type)
+- Risk heatmap (red overlay)
+- Evacuation routes (green line)
+- User's selected location (green)
+
+**Location**: `firelink/frontend/src/components/MapView.tsx`
+
+---
+
+## 🔄 Development Workflow
+
+### 1. Backend Development
 
 ```bash
-cd backend
-
-# 1. Verify Docker available
-make check
-
-# 2. Build images, start all 7 containers
-make up-build
-# wait ~30s — Kafka healthcheck must pass before backend boots
-
-# 3. Confirm all containers healthy
-make ps
-# expect 7 firelink-* containers, all "Up"
-
-# 4. Confirm API live
-make health
-# {"status":"healthy","service":"FireLink API"}
-
-# 5. One-time: load wildfire PDFs into Pinecone
-make ingest
+cd firelink/backend
+source venv/bin/activate
+python -m uvicorn app.main:app --reload
 ```
 
-Then frontend (separate terminal):
+- Edit files in `app/`
+- Server auto-reloads on changes
+- Check http://localhost:8000/docs for API testing
+
+### 2. Frontend Development
 
 ```bash
-cd frontend
-npm install        # first time only
-npm run dev        # http://localhost:3000
+cd firelink/frontend
+npm start
+```
+
+- Edit files in `src/`
+- Browser auto-reloads on changes
+- Check console for errors
+
+### 3. Testing Changes
+
+1. Backend makes changes → test in Swagger UI
+2. Frontend makes changes → see live in browser
+3. Both communicate via HTTP → check network tab
+
+---
+
+## 🐛 Common Issues & Fixes
+
+### Backend won't start
+
+```
+Error: Cannot find module 'app.main'
+```
+
+**Fix**: Make sure you're in `firelink/backend/` and venv is activated
+
+### Frontend shows connection error
+
+```
+Cannot connect to backend. Is it running?
+```
+
+**Fix**: Start backend first (Terminal 1), wait 3 seconds, then refresh browser
+
+### Database issues
+
+```
+Error: database is locked
+```
+
+**Fix**: Delete `firelink/backend/evaclink.db` and restart backend
+
+### CORS errors in console
+
+**Fix**: Backend CORS is pre-configured for `localhost:3000` and `localhost:5173`
+
+---
+
+## 📝 Seed Data
+
+The database auto-seeds on first run with:
+
+- **3 Shelters**: Highway 101, Santa Clara College, San Jose State
+- **3 Fire Reports**: Simulated fire sightings with notes
+- **3 Mock Reports**: Blocked roads, smoke, assistance requests
+
+**Edit seed data**: `firelink/backend/seed/*.json`
+
+---
+
+## 🚀 Next Steps
+
+### For Backend Team
+
+1. [ ] Improve risk scoring algorithm
+2. [ ] Add NetworkX/OSMnx for real routing
+3. [ ] Add WebSocket support for live updates
+4. [ ] Integrate real fire data (USGS/CalFire API)
+5. [ ] Add authentication & user roles
+6. [ ] Database indexing & optimization
+
+### For Frontend Team
+
+1. [ ] Enhance map styling & markers
+2. [ ] Add animations & transitions
+3. [ ] Improve form validation & UX
+4. [ ] Add WebSocket integration
+5. [ ] Responsive mobile design
+6. [ ] Dark mode support
+
+### For DevOps
+
+1. [ ] Docker setup (backend + frontend)
+2. [ ] CI/CD pipeline (GitHub Actions)
+3. [ ] Deployment (AWS/Azure/Heroku)
+4. [ ] Environment configuration
+5. [ ] Database migration scripts
+
+---
+
+## 💡 Tips for Success
+
+✅ **DO**:
+
+- Keep frontend and backend running simultaneously
+- Test API changes in Swagger UI first
+- Commit small, focused changes
+- Document new endpoints in README
+- Communicate between teams before major changes
+
+❌ **DON'T**:
+
+- Forget to activate venv before running backend
+- Edit backend files without understanding impact on frontend
+- Skip testing changes in API docs
+- Leave console errors unresolved
+- Commit without testing
+
+---
+
+## 📚 Resources
+
+- **FastAPI Docs**: https://fastapi.tiangolo.com/
+- **React Docs**: https://react.dev/
+- **Leaflet Docs**: https://leafletjs.com/
+- **Haversine Formula**: https://en.wikipedia.org/wiki/Haversine_formula
+- **GeoJSON Spec**: https://geojson.org/
+
+---
+
+## 🎓 Architecture Diagram
+
+```
+┌─────────────────────────────────────┐
+│     Browser (React App)              │
+│  MapView | ReportForm | RoutePanel  │
+└──────────────┬──────────────────────┘
+               │ HTTP/REST/WebSocket
+┌──────────────▼──────────────────────┐
+│     FastAPI Backend                  │
+│  ┌────────────┐  ┌────────────────┐ │
+│  │  Routers   │  │  Services      │ │
+│  │  (APIs)    │  │  (Logic)       │ │
+│  └──────┬─────┘  └────────┬───────┘ │
+└─────────┼──────────────────┼────────┘
+          │                  │
+┌─────────▼──────────────────▼────────┐
+│     SQLite Database                  │
+│  ┌─────────────┐  ┌──────────────┐  │
+│  │  Reports    │  │  Shelters    │  │
+│  └─────────────┘  └──────────────┘  │
+└──────────────────────────────────────┘
 ```
 
 ---
 
-## Daily run (after first-time setup)
+## 📞 Questions?
 
-```bash
-# terminal 1 — backend
-cd backend
-make up            # reuses built images
+Check the relevant README:
 
-# terminal 2 — frontend
-cd frontend
-npm run dev
-```
-
-Stop everything:
-
-```bash
-cd backend
-make down          # stop containers, keep volumes (SQLite preserved)
-```
-
-Nuke state (wipes SQLite + volumes):
-
-```bash
-make clean
-```
+- **Backend issues**: See `firelink/backend/README.md`
+- **Frontend issues**: See `firelink/frontend/README.md`
+- **Overall project**: See `firelink/README.md`
 
 ---
 
-## URLs
-
-| What | URL |
-|---|---|
-| Frontend dashboard | http://localhost:3000 |
-| Demo ZIP page | http://localhost:3000/dashboard/91001 |
-| Backend API | http://localhost:8000 |
-| Backend health | http://localhost:8000/health |
-| OpenAPI docs | http://localhost:8000/docs |
-| Live context endpoint | http://localhost:8000/context/latest |
-| MCP server | http://localhost:8001 |
-
----
-
-## Frontend → backend wiring
-
-Frontend reads `NEXT_PUBLIC_API_URL`. Default: `http://localhost:8000`.
-
-To override, create `frontend/.env.local`:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-Restart `npm run dev` after env changes — Next.js bakes env at startup.
-
----
-
-## Exposing backend via ngrok (share with phone, demo to others, webhook testing)
-
-```bash
-# 1. Install
-npm i -g ngrok
-
-# 2. Sign up at https://dashboard.ngrok.com/signup
-#    Grab token at https://dashboard.ngrok.com/get-started/your-authtoken
-ngrok config add-authtoken <YOUR_TOKEN>
-
-# 3. Tunnel (keep running in its own terminal)
-ngrok http 8000
-# copy the https://xxxx.ngrok-free.app URL it prints
-
-# 4. Point frontend at tunnel
-echo 'NEXT_PUBLIC_API_URL=https://xxxx.ngrok-free.app' > frontend/.env.local
-
-# 5. Restart frontend
-cd frontend && npm run dev
-```
-
-Free-tier URL changes every ngrok restart. Reserve a static domain in the ngrok dashboard and run:
-
-```bash
-ngrok http 8000 --domain=your-name.ngrok-free.app
-```
-
-The frontend already sends `ngrok-skip-browser-warning: true` (see `frontend/src/lib/api.ts`), bypassing the free-tier interstitial.
-
-If you want CORS to accept calls from a tunneled frontend too (e.g. mobile testing), add origins via env in `backend/docker-compose.yml`:
-
-```yaml
-- CORS_ORIGINS=http://localhost:3000,https://your-frontend.ngrok-free.app
-```
-
-Then restart backend: `make down && make up`.
-
----
-
-## Common Makefile targets (run from `backend/`)
-
-| Command | What |
-|---|---|
-| `make help` | List all targets |
-| `make up` | Start containers |
-| `make up-build` | Rebuild images, then start |
-| `make down` | Stop containers |
-| `make clean` | Stop + wipe volumes |
-| `make ps` | Container status |
-| `make logs` | Tail backend logs |
-| `make logs-all` | Tail every container |
-| `make logs-calfire` | Tail CAL FIRE producer |
-| `make logs-noaa` | Tail NOAA producer |
-| `make logs-recommendation` | Tail recommendation agent |
-| `make logs-mcp` | Tail MCP server |
-| `make stream-fire` | Live Kafka topic: `firelink.fire` |
-| `make stream-weather` | Live Kafka topic: `firelink.weather` |
-| `make stream-recommendations` | Live Kafka topic: `firelink.recommendations` |
-| `make topics` | List Kafka topics |
-| `make context` | Pretty-print `/context/latest` |
-| `make health` | Hit `/health` from inside container |
-| `make ingest` | Load `docs/*.pdf` → Pinecone (one-shot) |
-| `make sms` | Interactive SMS simulator (Help Agent) |
-| `make sms-replay` | Batch replay `test/sms_test_cases.json` |
-| `make test` | Smoke test: containers + REST + Help Agent |
-| `make frontend-install` | `npm install` in frontend |
-| `make frontend-dev` | `npm run dev` in frontend |
-| `make frontend-build` | Production build |
-| `make frontend-start` | Production server |
-| `make frontend-lint` | ESLint |
-
----
-
-## Troubleshooting
-
-**Backend container restart-looping**
-- `make logs` — check stack trace
-- Most common: missing env key in `backend/.env`
-- Kafka not yet healthy — wait 30s and retry
-
-**Recommendation agent restarting**
-- Needs `OPENAI_API_KEY`
-- `make logs-recommendation` to confirm
-
-**Frontend can't reach backend**
-- Confirm backend up: `curl http://localhost:8000/health`
-- Check `NEXT_PUBLIC_API_URL` — restart `npm run dev` after changing
-- Browser devtools → Network tab → check actual URL hit
-
-**CORS error in browser**
-- Backend `CORS_ORIGINS` env defaults to `http://localhost:3000`
-- If frontend on different origin, edit `backend/docker-compose.yml` `CORS_ORIGINS`, then `make down && make up`
-
-**`make ingest` fails**
-- Pinecone index must exist with name matching `PINECONE_INDEX_NAME`
-- Create at https://app.pinecone.io with embedding dimension matching the OpenAI embedding model used
-
-**Port already in use**
-- 8000, 8001, 9092, 3000 must be free
-- `lsof -i :8000` to find offender
-- Kill with `kill <pid>` or change port mapping in `docker-compose.yml`
-
-**Nothing in Kafka topics**
-- Producers seed from `app/data/*.json` on startup
-- `make logs-calfire` / `make logs-noaa` to confirm replay
-- `make clean && make up-build` to fully reset
-
-**SQLite stale data**
-- `make clean` (wipes volume) then `make up-build`
-
----
-
-## Production build (frontend)
-
-```bash
-cd frontend
-npm run build
-npm run start    # http://localhost:3000
-```
-
-Set `NEXT_PUBLIC_API_URL` in environment before `npm run build` — Next.js bakes public env at build time.
-
----
-
-## Security checklist before pushing to git
-
-- [ ] `backend/.env` is in `.gitignore` (already is — `git check-ignore backend/.env` should print the path)
-- [ ] No keys hardcoded in source (`git grep -E 'sk-(proj|ant)-|pcsk-'` returns nothing)
-- [ ] Rotate any key that ever touched a public commit, no exceptions
-- [ ] `ssh-key-2026-05-09.key.pub` is a public key — safe to commit, but private counterpart must never be
-
----
-
-## Component docs
-
-- `backend/README.md` — service-by-service architecture, Kafka topics, agent internals
-- `frontend/README.md` — Next.js app routes, dashboard wiring
-- `docs/architecture-breakdown.md` — full-stack overview (backend endpoints/agents + frontend routes/structure)
-- `docs/streaming-pipeline.md` — real-time data pipeline: data sources, Kafka internals, context retrieval
-- `backend/docs/` — wildfire knowledge PDFs ingested into Pinecone
+**Built for emergency response. Let's save lives! 🚀**

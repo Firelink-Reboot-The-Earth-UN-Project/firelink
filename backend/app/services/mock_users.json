@@ -1,0 +1,62 @@
+[
+  {
+    "phone": "+16195550001",
+    "name": "Maria",
+    "zip": "92103",
+    "pets": 2,
+    "has_vehicle": false,
+    "medical_device": true,
+    "needs_ride": true,
+    "volunteer": false,
+    "prep_steps_complete": 2,
+    "prep_steps_total": 5
+  },
+  {
+    "phone": "+16195550002",
+    "name": "James",
+    "zip": "92103",
+    "pets": 0,
+    "has_vehicle": true,
+    "medical_device": false,
+    "needs_ride": false,
+    "volunteer": true,
+    "prep_steps_complete": 5,
+    "prep_steps_total": 5
+  },
+  {
+    "phone": "+16195550003",
+    "name": "Linda",
+    "zip": "92104",
+    "pets": 1,
+    "has_vehicle": false,
+    "medical_device": false,
+    "needs_ride": true,
+    "volunteer": false,
+    "prep_steps_complete": 1,
+    "prep_steps_total": 5
+  },
+  {
+    "phone": "+16195550004",
+    "name": "Carlos",
+    "zip": "92104",
+    "pets": 0,
+    "has_vehicle": true,
+    "medical_device": true,
+    "needs_ride": false,
+    "volunteer": false,
+    "prep_steps_complete": 3,
+    "prep_steps_total": 5
+  },
+  {
+    "phone": "+16195550005",
+    "name": "Aisha",
+    "zip": "92105",
+    "pets": 3,
+    "has_vehicle": true,
+    "medical_device": false,
+    "needs_ride": false,
+    "volunteer": true,
+    "prep_steps_complete": 4,
+    "prep_steps_total": 5
+  }
+]
