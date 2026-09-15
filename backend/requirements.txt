@@ -9,6 +9,7 @@ python-dotenv>=1.0.0
 groq>=0.9.0
 openai>=1.0
 langchain>=0.1.0
+anthropic==0.125.0
 langchain-core
 langchain-community
 langchain-openai
@@ -16,4 +17,3 @@ langchain-pinecone
 langchain-text-splitters
 pinecone
 PyMuPDF
-anthropic
