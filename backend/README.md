@@ -20,10 +20,13 @@ list — all in a single Claude call.
 | `firelink-recommendation-agent` | — | OpenAI `gpt-4o-mini`, every 60s |
 | `firelink-mcp-server` | 8001 | FastMCP `get_context` tool |
 
+In local dev mode only zookeeper + kafka run in Docker; the Python services
+run on the host from `backend/.venv` — see "Local development" below.
+
 ## Prerequisites
 
-- Docker Desktop running
-- `.env` at repo root with these keys:
+- Docker Desktop running (full stack, or Kafka-only in local dev mode)
+- `backend/.env` with these keys:
 
       OPENAI_API_KEY=...         # recommendation-agent + Pinecone embeddings
       ANTHROPIC_API_KEY=...      # Help Agent (Claude SMS reply)
@@ -41,6 +44,30 @@ list — all in a single Claude call.
 
 `make test` exits 0 if everything passes, 1 if anything fails. Per-check
 PASS/FAIL lines tell you what broke.
+
+## Local development (hybrid)
+
+Active backend development without rebuilding images: only zookeeper + kafka
+run in Docker (host listener `:29092` via `docker-compose.dev.yml`); the API,
+producers, and agent run on the host from `backend/.venv`:
+
+    make dev-venv           # once: create .venv + install requirements.txt
+    make dev-infra          # zookeeper + kafka only
+    make dev-api            # uvicorn --reload :8000
+    make dev-calfire        # when you need incident data flowing
+    make dev-noaa
+    make dev-recommendation
+
+Requires two extra lines in `backend/.env` (host-only; containers use their
+own config):
+
+    KAFKA_BOOTSTRAP=localhost:29092
+    DATABASE_URL=sqlite:///app/data/firelink.db
+
+Run everything from `backend/` — the SQLite path is CWD-relative (DB lands at
+`app/data/firelink.db`, re-seeded by producers on startup). `make dev-down`
+stops all containers in the compose project. See the repo README for the
+full guide.
 
 ## What `make test` checks
 
@@ -136,6 +163,13 @@ ready. Wait for `make ps` to show `firelink-backend` as healthy, then rerun.
 **Kafka unhealthy / producers can't connect** — Kafka takes 15-30s to come up
 after `make up-build`. Watch `make logs-all` until you see
 `Kafka connected (attempt 1)` from the producers.
+
+**Host process can't reach Kafka (local dev)** — `make dev-infra` running and
+healthy? Host processes must use `localhost:29092` (`KAFKA_BOOTSTRAP` in
+`backend/.env`); `kafka:9092` and `localhost:9092` are container-only.
+
+**`unable to open database file` (local dev)** — run from `backend/`, not the
+repo root; `DATABASE_URL` is CWD-relative.
 
 ## Layout
 

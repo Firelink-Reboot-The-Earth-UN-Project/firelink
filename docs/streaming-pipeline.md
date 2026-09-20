@@ -106,6 +106,10 @@ bridge, started via `make up-build`. Producers and backend connect to Kafka
 at `kafka:9092` (internal DNS). See `backend/docker-compose.yml` for the full
 config (build context, healthchecks, env vars, volumes).
 
+For local backend development, `docker-compose.dev.yml` layers a host listener
+onto the broker so only zookeeper + kafka need to run in Docker — see the repo
+README's "Local backend development" section.
+
 | Container | Purpose | Port | Depends on |
 |---|---|---|---|
 | `firelink-zookeeper` | Kafka coordinator | — | — |
@@ -318,7 +322,7 @@ window for a given replay position.
 | Setting | Value | Location |
 |---|---|---|
 | Bootstrap server (in-container) | `kafka:9092` | `docker-compose.yml`, `app/core/kafka.py` |
-| Bootstrap server (host-side) | `localhost:9092` | `docker-compose.yml` port mapping |
+| Bootstrap server (host-side, local dev) | `localhost:29092` | `docker-compose.dev.yml` HOST listener, `KAFKA_BOOTSTRAP` in `backend/.env` |
 | Messages read per topic | 10 | `MESSAGES_PER_TOPIC` in `context_service.py` |
 | Overall context fetch timeout | 10s | `asyncio.wait_for` in `get_latest_context()` |
 | Per-message read timeout | 2s | `asyncio.wait_for` in `_read_latest()` |

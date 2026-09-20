@@ -27,12 +27,48 @@ npm run dev
 
 ---
 
+## Local backend development (hybrid)
+
+Faster loop when you're actively developing the backend: only zookeeper + Kafka run in Docker; the API, producers, and agent run natively from a Python venv with `uvicorn --reload`. Full-stack Docker (above) stays the default for demos and onboarding.
+
+First time, from `backend/`:
+
+```bash
+make dev-venv
+```
+
+Add two host-only lines to `backend/.env` (containers ignore both — compose sets its own config):
+
+```env
+KAFKA_BOOTSTRAP=localhost:29092
+DATABASE_URL=sqlite:///app/data/firelink.db
+```
+
+Daily loop — each in its own terminal, all from `backend/`:
+
+```bash
+make dev-infra           # once: zookeeper + kafka in Docker (host listener :29092)
+make dev-api             # FastAPI, uvicorn --reload on :8000
+make dev-calfire         # fire incidents → Kafka + SQLite (start when you need data)
+make dev-noaa            # weather alerts → Kafka + SQLite
+make dev-recommendation  # OpenAI advisory agent → Kafka
+```
+
+Notes:
+
+- Host processes reach Kafka on `localhost:29092` — a HOST listener added by `docker-compose.dev.yml`; the base file's `kafka:9092` stays container-internal, so teammates running `make up` are unaffected.
+- `DATABASE_URL` is CWD-relative: run from `backend/` and the DB lands at `backend/app/data/firelink.db` (gitignored, re-seeded by the producers on startup).
+- `make dev-down` stops **all** containers in the compose project — run `make down` first when switching from a full-stack session.
+
+---
+
 ## Repo layout
 
 ```
-Downloads/
+firelink/
 ├── backend/          # FastAPI, Kafka, agents, MCP server (docker-compose)
 ├── frontend/         # Next.js 16, TypeScript, Tailwind, Leaflet
+├── docs/             # documentation for application and run guides
 └── README.md         # this file
 ```
 
@@ -42,11 +78,11 @@ Downloads/
 
 | Tool | Version | Install |
 |---|---|---|
-| Docker Desktop | running | https://www.docker.com/products/docker-desktop |
+| Docker Desktop | running (full stack, or Kafka-only in local dev) | https://www.docker.com/products/docker-desktop |
 | Docker Compose v2 | bundled with Docker Desktop | — |
 | Node.js | ≥ 20 | `nvm install 20` or https://nodejs.org |
 | npm | bundled with Node | — |
-| Python 3 | ≥ 3.10 (only for `make sms`, `make test`, `make ingest` host-side) | `brew install python` |
+| Python 3 | ≥ 3.10 (host-side tools; runs the whole backend in local dev mode) | `brew install python` |
 | make | preinstalled on macOS | — |
 
 Verify:
@@ -82,7 +118,7 @@ Where each is used:
 
 ## First-time setup
 
-Run from `Downloads/backend/`:
+Run from project root:
 
 ```bash
 cd backend
@@ -236,6 +272,13 @@ Then restart backend: `make down && make up`.
 | `make sms` | Interactive SMS simulator (Help Agent) |
 | `make sms-replay` | Batch replay `test/sms_test_cases.json` |
 | `make test` | Smoke test: containers + REST + Help Agent |
+| `make dev-venv` | Local dev: create `backend/.venv` + install requirements |
+| `make dev-infra` | Local dev: start zookeeper + kafka only (host listener `:29092`) |
+| `make dev-down` | Local dev: stop Docker containers |
+| `make dev-api` | Local dev: FastAPI via `uvicorn --reload` (`:8000`) |
+| `make dev-calfire` | Local dev: CAL FIRE producer on host |
+| `make dev-noaa` | Local dev: NOAA producer on host |
+| `make dev-recommendation` | Local dev: recommendation agent on host |
 | `make frontend-install` | `npm install` in frontend |
 | `make frontend-dev` | `npm run dev` in frontend |
 | `make frontend-build` | Production build |
@@ -280,6 +323,14 @@ Then restart backend: `make down && make up`.
 
 **SQLite stale data**
 - `make clean` (wipes volume) then `make up-build`
+- Local dev: delete `backend/app/data/firelink.db` and restart the producers
+
+**Host process can't reach Kafka (local dev)**
+- `make dev-infra` must be up — `docker compose ps` should show kafka healthy
+- Host processes must use `localhost:29092` (`KAFKA_BOOTSTRAP` in `backend/.env`) — `kafka:9092` and `localhost:9092` are container-only
+
+**`unable to open database file` (local dev)**
+- `DATABASE_URL` is CWD-relative — run `make dev-*` targets from `backend/`, not the repo root
 
 ---
 
