@@ -103,16 +103,25 @@ Create `backend/.env` (already gitignored — never commit):
 
 ```env
 OPENAI_API_KEY=sk-proj-...
-ANTHROPIC_API_KEY=sk-ant-...
 PINECONE_API_KEY=pcsk-...
 PINECONE_INDEX_NAME=rte-wildfire-data
 ```
 
 Where each is used:
 
-- `OPENAI_API_KEY` — recommendation agent (`gpt-4o-mini`) + Pinecone embeddings during ingest
-- `ANTHROPIC_API_KEY` — Help Agent (Claude SMS replies + chat)
+- `OPENAI_API_KEY` — chat models (hosted OpenAI, see below) + Pinecone embeddings during ingest
 - `PINECONE_API_KEY` + `PINECONE_INDEX_NAME` — RAG vector store for wildfire knowledge PDFs
+
+Optional — run the chat models on a local, open-source stack instead of hosted
+OpenAI (any OpenAI-compatible server: Ollama, vLLM, LM Studio, llama.cpp):
+
+```env
+OPENAI_BASE_URL=http://localhost:11434/v1   # Ollama (host.docker.internal:11434/v1 in full docker-compose)
+HELP_MODEL=qwen3.5:27b                       # Help Agent (default gpt-4o)
+RECOMMENDATION_MODEL=qwen3.5:27b             # Recommendation Agent (default gpt-4o-mini)
+```
+
+See "Local / open-source models" in `docs/architecture-breakdown.md` for details.
 
 ---
 

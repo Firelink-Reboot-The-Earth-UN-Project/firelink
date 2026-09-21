@@ -49,13 +49,18 @@ services:
       - CORS_ORIGINS=http://localhost:3000
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - PINECONE_API_KEY=${PINECONE_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - PINECONE_INDEX_NAME=${PINECONE_INDEX_NAME:-emberlink}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+      - HELP_MODEL=${HELP_MODEL:-}
+      - RECOMMENDATION_MODEL=${RECOMMENDATION_MODEL:-}
     volumes:
       - ./app:/app/app
       - ./docs:/app/docs
       - firelink-db:/app/data
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # lets the container reach a host-run Ollama at http://host.docker.internal:11434/v1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - firelink-network
     healthcheck:
@@ -143,10 +148,16 @@ services:
       - PYTHONUNBUFFERED=1
       - KAFKA_BOOTSTRAP=kafka:9092
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+      - HELP_MODEL=${HELP_MODEL:-}
+      - RECOMMENDATION_MODEL=${RECOMMENDATION_MODEL:-}
     volumes:
       - ./app:/app/app
       - firelink-db:/app/data
     command: python -m app.run_agent recommendation
+    # lets the container reach a host-run Ollama at http://host.docker.internal:11434/v1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       disable: true
     networks:

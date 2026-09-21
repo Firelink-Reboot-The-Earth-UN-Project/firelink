@@ -15,7 +15,7 @@ DEV_COMPOSE := docker compose -f docker-compose.yml -f docker-compose.dev.yml
 .PHONY: help check up up-build down clean logs ps health \
         logs-calfire logs-noaa logs-all logs-mcp logs-recommendation \
         stream-fire stream-weather stream-recommendations \
-        context topics mcp-server ingest sms sms-replay test \
+        context topics mcp-server ingest sms sms-replay test unit \
         check-npm frontend-install frontend-dev frontend-build frontend-start frontend-lint \
         check-venv dev-venv dev-infra dev-down dev-api dev-calfire dev-noaa dev-recommendation
 
@@ -46,6 +46,7 @@ help:
 	@echo "  make sms                 Interactive SMS simulator (talks to /sms/inbound)"
 	@echo "  make sms-replay          Batch-replay sms_test_cases.json through the Help Agent"
 	@echo "  make test                Smoke-test running stack (make + REST + Help Agent)"
+	@echo "  make unit                Run llm.py unit tests (pytest; no stack needed)"
 	@echo ""
 	@echo "  make frontend-install    Install Next.js dependencies (npm install)"
 	@echo "  make frontend-dev        Run Next.js dev server (port 3000)"
@@ -144,6 +145,10 @@ sms-replay:
 
 test:
 	@python3 test/smoke_test.py
+
+unit: check-venv
+	$(VENV)/bin/pip show pytest >/dev/null 2>&1 || $(VENV)/bin/pip install -r requirements-dev.txt
+	$(PY) -m pytest test/test_llm.py -v
 
 check-npm:
 	@test -n "$(NPM_BIN)" || { echo "npm not found on PATH. Run 'nvm use' (or otherwise ensure npm is on PATH) before using frontend-* targets, or override: make frontend-dev NPM_BIN=/path/to/npm"; exit 1; }

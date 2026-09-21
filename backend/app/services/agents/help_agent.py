@@ -8,7 +8,7 @@ Blends:
   - RAG chunks (Pinecone, top-K)
   - Open shelter list (shelters.json)
 
-into a single Claude prompt and returns an SMS-shaped reply in the user's
+into a single LLM prompt and returns an SMS-shaped reply in the user's
 language.
 """
 
@@ -19,8 +19,6 @@ import json
 import logging
 import os
 from pathlib import Path
-
-import anthropic
 
 from app.services.context_service import (
     get_latest_context,
@@ -33,12 +31,13 @@ from app.services.knowledge.rag_query import (
     retrieve_chunks,
     serialize_user_profile,
 )
+from app.services.llm import complete_sms
 
 logger = logging.getLogger(__name__)
 
 SHELTERS_PATH = PROJECT_ROOT / "app" / "data" / "shelters.json"
 
-CLAUDE_MODEL = "claude-sonnet-4-6"
+HELP_MODEL = os.getenv("HELP_MODEL") or "gpt-4o"
 MAX_TOKENS = 400
 
 SYSTEM_PROMPT = """You are FireLink, an informative, multilingual emergency assistant for the 2025 Eaton Fire in Los Angeles.
@@ -55,32 +54,35 @@ Tool policy:
 """
 
 NOTIFY_DISPATCH_TOOL = {
-    "name": "notify_dispatch",
-    "description": (
-        "Notify emergency dispatch (911) for an active, life-threatening situation. "
-        "Call ONLY when the user reports immediate danger right now: trapped, injured, "
-        "burned, unconscious, fire inside or at the door, smoke inhalation, medical "
-        "crisis, surrounded by flames, or unable to evacuate. "
-        "Do NOT call for information questions, status checks, shelter inquiries, "
-        "evacuation-zone questions, or past-tense reports."
-    ),
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "user_phone": {
-                "type": "string",
-                "description": "User's phone number in E.164 format.",
+    "type": "function",
+    "function": {
+        "name": "notify_dispatch",
+        "description": (
+            "Notify emergency dispatch (911) for an active, life-threatening situation. "
+            "Call ONLY when the user reports immediate danger right now: trapped, injured, "
+            "burned, unconscious, fire inside or at the door, smoke inhalation, medical "
+            "crisis, surrounded by flames, or unable to evacuate. "
+            "Do NOT call for information questions, status checks, shelter inquiries, "
+            "evacuation-zone questions, or past-tense reports."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "user_phone": {
+                    "type": "string",
+                    "description": "User's phone number in E.164 format.",
+                },
+                "emergency_type": {
+                    "type": "string",
+                    "description": "Short label such as 'trapped', 'medical', 'fire_at_residence', 'injured'.",
+                },
+                "details": {
+                    "type": "string",
+                    "description": "One-sentence factual summary of the situation in English.",
+                },
             },
-            "emergency_type": {
-                "type": "string",
-                "description": "Short label such as 'trapped', 'medical', 'fire_at_residence', 'injured'.",
-            },
-            "details": {
-                "type": "string",
-                "description": "One-sentence factual summary of the situation in English.",
-            },
+            "required": ["user_phone", "emergency_type", "details"],
         },
-        "required": ["user_phone", "emergency_type", "details"],
     },
 }
 
@@ -186,32 +188,6 @@ async def _retrieve_chunks_async(message: str) -> list[str]:
     return await asyncio.to_thread(retrieve_chunks, message)
 
 
-async def _call_claude(user_prompt: str):
-    """Single Claude call with the notify_dispatch tool available. Returns the raw message."""
-    client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    return await client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=MAX_TOKENS,
-        tools=[NOTIFY_DISPATCH_TOOL],
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
-
-
-def _extract_tool_use(message):
-    for block in message.content:
-        if getattr(block, "type", None) == "tool_use" and block.name == "notify_dispatch":
-            return block
-    return None
-
-
-def _extract_text(message) -> str:
-    for block in message.content:
-        if getattr(block, "type", None) == "text":
-            return block.text
-    return ""
-
-
 async def handle_sms(phone: str, user_message: str) -> dict:
     """Full Help-Agent pipeline for one inbound SMS.
 
@@ -281,14 +257,23 @@ async def handle_sms(phone: str, user_message: str) -> dict:
         user_message=user_message,
     )
 
-    message = await _call_claude(user_prompt)
+    result = await complete_sms(
+        model=HELP_MODEL,
+        system=SYSTEM_PROMPT,
+        user=user_prompt,
+        tools=[NOTIFY_DISPATCH_TOOL],
+        max_tokens=MAX_TOKENS,
+    )
 
-    tool_use = _extract_tool_use(message)
-    if tool_use is not None:
+    tool_call = next(
+        (tc for tc in result.tool_calls if tc.name == "notify_dispatch"),
+        None,
+    )
+    if tool_call is not None:
         dispatch = notify_dispatch(
-            user_phone=tool_use.input.get("user_phone", phone),
-            emergency_type=tool_use.input.get("emergency_type", "unspecified"),
-            details=tool_use.input.get("details", user_message),
+            user_phone=tool_call.arguments.get("user_phone", phone),
+            emergency_type=tool_call.arguments.get("emergency_type", "unspecified"),
+            details=tool_call.arguments.get("details", user_message),
         )
         ack = (
             f"Emergency dispatch notified. Units en route, ETA ~{dispatch['eta_minutes']} min. "
@@ -296,4 +281,4 @@ async def handle_sms(phone: str, user_message: str) -> dict:
         )
         return {"reply": ack, "is_emergency": True, "dispatch": dispatch}
 
-    return {"reply": _extract_text(message), "is_emergency": False, "dispatch": None}
+    return {"reply": result.text or "", "is_emergency": False, "dispatch": None}

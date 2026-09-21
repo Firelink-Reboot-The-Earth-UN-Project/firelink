@@ -158,7 +158,9 @@ def check_context() -> None:
 
 
 # ── Help-Agent SMS checks (loud failure when keys are missing)
-HELP_AGENT_KEYS = ("OPENAI_API_KEY", "PINECONE_API_KEY", "ANTHROPIC_API_KEY")
+# Embeddings still run on OpenAI (text-embedding-3-small), so OPENAI_API_KEY
+# stays required even when the chat models run locally via OPENAI_BASE_URL.
+HELP_AGENT_KEYS = ("OPENAI_API_KEY", "PINECONE_API_KEY")
 
 
 def check_help_agent_keys() -> None:
@@ -202,7 +204,7 @@ def main() -> int:
     run_check("GET /weather-alerts", check_weather_alerts)
     run_check("GET /context/latest", check_context)
 
-    print("Help Agent / SMS pipeline (Pinecone + OpenAI + Anthropic)")
+    print("Help Agent / SMS pipeline (Pinecone + LLM provider)")
     run_check("Help-Agent API keys present in env", check_help_agent_keys)
     run_check("POST /sms/inbound returns non-empty reply", check_sms_endpoint)
 
