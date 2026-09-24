@@ -49,9 +49,9 @@ PASS/FAIL lines tell you what broke.
 
 Active backend development without rebuilding images: only zookeeper + kafka
 run in Docker (host listener `:29092` via `docker-compose.dev.yml`); the API,
-producers, and agent run on the host from `backend/.venv`:
+producers, and agent run on the host from `backend/.venv` with `uvicorn --reload`. Full-stack Docker (above) stays the default for demos and onboarding.
 
-    make dev-venv           # once: create .venv + install requirements.txt
+    make dev-venv           # once (first time): create .venv + install requirements.txt
     make dev-infra          # zookeeper + kafka only
     make dev-api            # uvicorn --reload :8000
     make dev-calfire        # when you need incident data flowing
@@ -68,6 +68,14 @@ Run everything from `backend/` — the SQLite path is CWD-relative (DB lands at
 `app/data/firelink.db`, re-seeded by producers on startup). `make dev-down`
 stops all containers in the compose project. See the repo README for the
 full guide.
+
+Notes:
+
+- Host processes reach Kafka on `localhost:29092` — a HOST listener added by `docker-compose.dev.yml`; the base file's `kafka:9092` stays container-internal, so teammates running `make up` are unaffected.
+- `DATABASE_URL` is CWD-relative: run from `backend/` and the DB lands at `backend/app/data/firelink.db` (gitignored, re-seeded by the producers on startup).
+- `make dev-down` stops **all** containers in the compose project — run `make down` first when switching from a full-stack session.
+
+---
 
 ## What `make test` checks
 

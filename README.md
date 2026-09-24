@@ -97,6 +97,8 @@ Where each is used:
 - `OPENAI_API_KEY` — chat models (hosted OpenAI, see below) + Pinecone embeddings during ingest
 - `PINECONE_API_KEY` + `PINECONE_INDEX_NAME` — RAG vector store for wildfire knowledge PDFs
 
+Note: Never commit `.env` or API credentials.
+
 Optional — run the chat models on a local, open-source stack instead of hosted
 OpenAI (any OpenAI-compatible server: Ollama, vLLM, LM Studio, llama.cpp):
 
@@ -108,9 +110,7 @@ RECOMMENDATION_MODEL=qwen3.5:27b             # Recommendation Agent (default gpt
 
 See "Local / open-source models" in `docs/architecture-breakdown.md` for details.
 
----
-
-## First-time setup
+### 3. Start the backend stack
 
 Run from project root:
 
@@ -156,6 +156,10 @@ make test
 ```
 
 The smoke test checks the containers, Kafka topics, REST endpoints, credentials, and simulated SMS pipeline.
+
+### Local Development Mode Setup
+
+The above setup instructions are good for first time setup and for full application builds. If you are actively helping develop the backend, see `Local development (hybrid)` under `backend/README.md` which contains instructions for a faster development workflow without having to build and run all containers each time.
 
 ## Service URLs
 
