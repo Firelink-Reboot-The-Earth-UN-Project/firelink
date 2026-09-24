@@ -1,91 +1,71 @@
-# FireLink — Run Guide
+# FireLink
 
-Wildfire evacuation intelligence platform. Backend (FastAPI + Kafka + Pinecone + OpenAI/Anthropic agents) + frontend (Next.js dashboard + chat).
+**An SMS-first wildfire communication and community-intelligence platform.**
 
-This is the **monorepo run guide**. See `backend/README.md` and `frontend/README.md` for component-level details.
+FireLink explores how communities can access understandable wildfire information when connectivity, device access, or emergency-information systems are constrained. The project combines a simulated SMS experience, a web dashboard, replayed wildfire and weather records, retrieval-assisted guidance, and an event-streaming backend.
 
----
+FireLink began at the **2026 United Nations–UC San Diego Reboot the Earth Hackathon**, where the original project received first place. It is now being developed from a hackathon prototype into a maintainable open-source MVP and systems-research platform.
 
-## Quick run (3 terminals)
+> Note:
+> FireLink is currently a research and demonstration prototype. It replays historical and simulated data, does not contact emergency services, and must not be relied upon for evacuation orders or immediate safety decisions. In an emergency, follow instructions from local authorities and contact emergency services directly.
 
-Assumes first-time setup done (see below). For demo / fast restart:
+## Contents
 
-```bash
-# Terminal 1 — backend stack (rebuild + start)
-cd backend
-make up-build
+- [Project objectives](#project-objectives)
+- [Current capabilities](#current-capabilities)
+- [Architecture](#architecture)
+- [Technology stack](#technology-stack)
+- [Getting started](#getting-started)
+- [Service URLs](#service-urls)
+- [API overview](#api-overview)
+- [Repository structure](#repository-structure)
+- [Important terminology](#important-terminology)
+- [Roadmap](#roadmap)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
 
-# Terminal 2 — public tunnel for backend
-ngrok http 8000
-# copy the https://xxxx.ngrok-free.app URL → paste into frontend/.env.local
-#   NEXT_PUBLIC_API_URL=https://xxxx.ngrok-free.app
+## Project objectives
 
-# Terminal 3 — frontend:
-cd frontend
-npm run dev
-```
+- Provide a low-barrier, SMS-oriented interface for wildfire information.
+- Present concise, localized, and multilingual guidance.
+- Preserve the source, timestamp, freshness, and simulation status of operational data.
+- Continue operating in defined degraded modes when optional AI services fail.
+- Explore resilient communication, distributed systems, local AI, and agent interoperability.
+- Develop toward open-source and Digital Public Goods best practices.
 
----
+## Current capabilities
 
-## Local backend development (hybrid)
+FireLink is an **MVP prototype under architectural revision**. The current repository demonstrates:
 
-Faster loop when you're actively developing the backend: only zookeeper + Kafka run in Docker; the API, producers, and agent run natively from a Python venv with `uvicorn --reload`. Full-stack Docker (above) stays the default for demos and onboarding.
+- Historical CAL FIRE incident and Open-Meteo weather replay.
+- Kafka topics for fire, weather, and AI-generated recommendations.
+- FastAPI endpoints for fire incidents, weather alerts, context, community data, recommendations, and simulated SMS.
+- A multilingual Help Agent using operational context, shelter data, mock user profiles, and retrieved preparedness information.
+- A Next.js dashboard for wildfire conditions, community needs, resources, households, and chat.
+- An experimental MCP server that exposes context and mock-dispatch tools.
+- Docker Compose orchestration and basic smoke testing.
 
-First time, from `backend/`:
+The current implementation is not yet offline, connected to a real SMS provider, or backed by a live authoritative emergency feed.
 
-```bash
-make dev-venv
-```
 
-Add two host-only lines to `backend/.env` (containers ignore both — compose sets its own config):
+For more detail, see:
 
-```env
-KAFKA_BOOTSTRAP=localhost:29092
-DATABASE_URL=sqlite:///app/data/firelink.db
-```
+- [`docs/architecture-breakdown.md`](docs/architecture-breakdown.md)
+- [`docs/streaming-pipeline.md`](docs/streaming-pipeline.md)
 
-Daily loop — each in its own terminal, all from `backend/`:
 
-```bash
-make dev-infra           # once: zookeeper + kafka in Docker (host listener :29092)
-make dev-api             # FastAPI, uvicorn --reload on :8000
-make dev-calfire         # fire incidents → Kafka + SQLite (start when you need data)
-make dev-noaa            # weather alerts → Kafka + SQLite
-make dev-recommendation  # OpenAI advisory agent → Kafka
-```
+Hosted AI and retrieval services are current implementation choices, not permanent architectural requirements. Ollama and LocalAI are being evaluated as local alternatives.
 
-Notes:
+## Getting started
 
-- Host processes reach Kafka on `localhost:29092` — a HOST listener added by `docker-compose.dev.yml`; the base file's `kafka:9092` stays container-internal, so teammates running `make up` are unaffected.
-- `DATABASE_URL` is CWD-relative: run from `backend/` and the DB lands at `backend/app/data/firelink.db` (gitignored, re-seeded by the producers on startup).
-- `make dev-down` stops **all** containers in the compose project — run `make down` first when switching from a full-stack session.
+### Prerequisites
 
----
+- Docker Desktop with Docker Compose v2
+- Node.js 20 or newer with npm
+- Python 3.10 or newer for host-side utilities
+- Make
 
-## Repo layout
-
-```
-firelink/
-├── backend/          # FastAPI, Kafka, agents, MCP server (docker-compose)
-├── frontend/         # Next.js 16, TypeScript, Tailwind, Leaflet
-├── docs/             # documentation for application and run guides
-└── README.md         # this file
-```
-
----
-
-## Prerequisites
-
-| Tool | Version | Install |
-|---|---|---|
-| Docker Desktop | running (full stack, or Kafka-only in local dev) | https://www.docker.com/products/docker-desktop |
-| Docker Compose v2 | bundled with Docker Desktop | — |
-| Node.js | ≥ 20 | `nvm install 20` or https://nodejs.org |
-| npm | bundled with Node | — |
-| Python 3 | ≥ 3.10 (host-side tools; runs the whole backend in local dev mode) | `brew install python` |
-| make | preinstalled on macOS | — |
-
-Verify:
+Verify the required tools:
 
 ```bash
 docker --version
@@ -95,11 +75,16 @@ npm --version
 python3 --version
 ```
 
----
+### 1. Clone the repository
 
-## API keys you need
+```bash
+git clone https://github.com/Firelink-Reboot-The-Earth-UN-Project/firelink.git
+cd firelink
+```
 
-Create `backend/.env` (already gitignored — never commit):
+### 2. Configure the backend
+
+Create `backend/.env` with the credentials required by the current hosted implementation:
 
 ```env
 OPENAI_API_KEY=sk-proj-...
@@ -131,243 +116,215 @@ Run from project root:
 
 ```bash
 cd backend
-
-# 1. Verify Docker available
 make check
-
-# 2. Build images, start all 7 containers
 make up-build
-# wait ~30s — Kafka healthcheck must pass before backend boots
+```
 
-# 3. Confirm all containers healthy
+Wait for Kafka and the backend to start, then verify the services:
+
+```bash
 make ps
-# expect 7 firelink-* containers, all "Up"
-
-# 4. Confirm API live
 make health
-# {"status":"healthy","service":"FireLink API"}
+```
 
-# 5. One-time: load wildfire PDFs into Pinecone
+The first build may take several minutes while Docker downloads images and installs dependencies.
+
+### 4. Load preparedness documents
+
+```bash
 make ingest
 ```
 
-Then frontend (separate terminal):
+This one-time step loads the included preparedness documents into the configured Pinecone index. It is required by the current RAG-enabled Help Agent.
+
+### 5. Start the frontend
+
+In a second terminal, from the repository root:
 
 ```bash
 cd frontend
-npm install        # first time only
-npm run dev        # http://localhost:3000
-```
-
----
-
-## Daily run (after first-time setup)
-
-```bash
-# terminal 1 — backend
-cd backend
-make up            # reuses built images
-
-# terminal 2 — frontend
-cd frontend
+npm install
 npm run dev
 ```
 
-Stop everything:
+### 6. Run the smoke test
+
+From `backend/`:
 
 ```bash
-cd backend
-make down          # stop containers, keep volumes (SQLite preserved)
+make test
 ```
 
-Nuke state (wipes SQLite + volumes):
+The smoke test checks the containers, Kafka topics, REST endpoints, credentials, and simulated SMS pipeline.
 
-```bash
-make clean
+## Service URLs
+
+| Service | URL |
+| --- | --- |
+| Frontend dashboard | <http://localhost:3000> |
+| Demonstration ZIP | <http://localhost:3000/dashboard/91001> |
+| Backend API | <http://localhost:8000> |
+| API documentation | <http://localhost:8000/docs> |
+| Health endpoint | <http://localhost:8000/health> |
+| Latest context | <http://localhost:8000/context/latest> |
+| MCP server | <http://localhost:8001> |
+
+## API overview
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | Check backend availability |
+| `GET` | `/community/{zip}` | Retrieve demonstration community data |
+| `GET` | `/context/latest` | Retrieve recent fire and weather context from Kafka |
+| `GET` | `/fire-incidents` | List stored fire incidents |
+| `POST` | `/fire-incidents` | Create a fire incident record |
+| `GET` | `/fire-incidents/{id}` | Retrieve one fire incident |
+| `PATCH` | `/fire-incidents/{id}` | Update one fire incident |
+| `DELETE` | `/fire-incidents/{id}` | Delete one fire incident |
+| `GET` | `/weather-alerts` | List stored weather alerts |
+| `POST` | `/weather-alerts` | Create a weather alert record |
+| `GET` | `/weather-alerts/{id}` | Retrieve one weather alert |
+| `PATCH` | `/weather-alerts/{id}` | Update one weather alert |
+| `DELETE` | `/weather-alerts/{id}` | Delete one weather alert |
+| `GET` | `/agents/recommendations/latest` | Retrieve the latest AI-generated recommendation |
+| `POST` | `/sms/inbound` | Submit a simulated inbound SMS message |
+
+Use the interactive OpenAPI documentation at <http://localhost:8000/docs> for the exact request and response schemas.
+
+## Repository structure
+
+```text
+firelink/
+├── README.md                       # Project overview and quick start
+├── backend/
+│   ├── app/
+│   │   ├── main.py                 # FastAPI application entry point
+│   │   ├── core/                   # Database and Kafka configuration
+│   │   ├── data/                   # Replay, community and mock data
+│   │   ├── models/                 # SQLAlchemy database models
+│   │   ├── schemas/                # Pydantic API schemas
+│   │   ├── repository/             # Database access layer
+│   │   ├── routes/                 # REST and simulated-SMS endpoints
+│   │   ├── services/
+│   │   │   ├── agents/             # Help and recommendation agents
+│   │   │   ├── knowledge/          # RAG ingestion and retrieval
+│   │   │   ├── producers/          # Fire and weather Kafka producers
+│   │   │   ├── context_service.py  # Kafka context retrieval
+│   │   │   ├── community_service.py
+│   │   │   └── dispatch_service.py # Mock dispatch behavior
+│   │   ├── mcp_server.py           # Experimental MCP interface
+│   │   ├── run_agent.py
+│   │   └── run_producer.py
+│   ├── docs/                       # Preparedness documents for RAG
+│   ├── test/                       # Smoke test and SMS CLI
+│   ├── docker-compose.yml          # Local service orchestration
+│   ├── Dockerfile
+│   ├── Dockerfile.mcp
+│   ├── Makefile
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── app/                    # Next.js routes and ZIP dashboards
+│   │   ├── components/             # Dashboard, fire, resource and chat UI
+│   │   ├── lib/                    # API client, types and data adapters
+│   │   └── data/                   # Frontend demonstration data
+│   ├── package.json
+│   └── README.md
+└── docs/
+    ├── architecture-breakdown.md   # Current full-stack architecture
+    └── streaming-pipeline.md       # Kafka and data-flow documentation
 ```
 
----
+## Project Roadmap
 
-## URLs
-
-| What | URL |
-|---|---|
-| Frontend dashboard | http://localhost:3000 |
-| Demo ZIP page | http://localhost:3000/dashboard/91001 |
-| Backend API | http://localhost:8000 |
-| Backend health | http://localhost:8000/health |
-| OpenAPI docs | http://localhost:8000/docs |
-| Live context endpoint | http://localhost:8000/context/latest |
-| MCP server | http://localhost:8001 |
-
----
-
-## Frontend → backend wiring
-
-Frontend reads `NEXT_PUBLIC_API_URL`. Default: `http://localhost:8000`.
-
-To override, create `frontend/.env.local`:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-Restart `npm run dev` after env changes — Next.js bakes env at startup.
-
----
-
-## Exposing backend via ngrok (share with phone, demo to others, webhook testing)
-
-```bash
-# 1. Install
-npm i -g ngrok
-
-# 2. Sign up at https://dashboard.ngrok.com/signup
-#    Grab token at https://dashboard.ngrok.com/get-started/your-authtoken
-ngrok config add-authtoken <YOUR_TOKEN>
-
-# 3. Tunnel (keep running in its own terminal)
-ngrok http 8000
-# copy the https://xxxx.ngrok-free.app URL it prints
-
-# 4. Point frontend at tunnel
-echo 'NEXT_PUBLIC_API_URL=https://xxxx.ngrok-free.app' > frontend/.env.local
-
-# 5. Restart frontend
-cd frontend && npm run dev
-```
-
-Free-tier URL changes every ngrok restart. Reserve a static domain in the ngrok dashboard and run:
-
-```bash
-ngrok http 8000 --domain=your-name.ngrok-free.app
-```
-
-The frontend already sends `ngrok-skip-browser-warning: true` (see `frontend/src/lib/api.ts`), bypassing the free-tier interstitial.
-
-If you want CORS to accept calls from a tunneled frontend too (e.g. mobile testing), add origins via env in `backend/docker-compose.yml`:
-
-```yaml
-- CORS_ORIGINS=http://localhost:3000,https://your-frontend.ngrok-free.app
-```
-
-Then restart backend: `make down && make up`.
-
----
-
-## Common Makefile targets (run from `backend/`)
-
-| Command | What |
-|---|---|
-| `make help` | List all targets |
-| `make up` | Start containers |
-| `make up-build` | Rebuild images, then start |
-| `make down` | Stop containers |
-| `make clean` | Stop + wipe volumes |
-| `make ps` | Container status |
-| `make logs` | Tail backend logs |
-| `make logs-all` | Tail every container |
-| `make logs-calfire` | Tail CAL FIRE producer |
-| `make logs-noaa` | Tail NOAA producer |
-| `make logs-recommendation` | Tail recommendation agent |
-| `make logs-mcp` | Tail MCP server |
-| `make stream-fire` | Live Kafka topic: `firelink.fire` |
-| `make stream-weather` | Live Kafka topic: `firelink.weather` |
-| `make stream-recommendations` | Live Kafka topic: `firelink.recommendations` |
-| `make topics` | List Kafka topics |
-| `make context` | Pretty-print `/context/latest` |
-| `make health` | Hit `/health` from inside container |
-| `make ingest` | Load `docs/*.pdf` → Pinecone (one-shot) |
-| `make sms` | Interactive SMS simulator (Help Agent) |
-| `make sms-replay` | Batch replay `test/sms_test_cases.json` |
-| `make test` | Smoke test: containers + REST + Help Agent |
-| `make dev-venv` | Local dev: create `backend/.venv` + install requirements |
-| `make dev-infra` | Local dev: start zookeeper + kafka only (host listener `:29092`) |
-| `make dev-down` | Local dev: stop Docker containers |
-| `make dev-api` | Local dev: FastAPI via `uvicorn --reload` (`:8000`) |
-| `make dev-calfire` | Local dev: CAL FIRE producer on host |
-| `make dev-noaa` | Local dev: NOAA producer on host |
-| `make dev-recommendation` | Local dev: recommendation agent on host |
-| `make frontend-install` | `npm install` in frontend |
-| `make frontend-dev` | `npm run dev` in frontend |
-| `make frontend-build` | Production build |
-| `make frontend-start` | Production server |
-| `make frontend-lint` | ESLint |
-
----
+- [ ] Define versioned event schemas with source, timestamp, freshness, verification, and simulation metadata.
+- [ ] Build a persistent current-state service so user requests do not create Kafka consumers.
+- [ ] Separate deterministic safety rules from AI explanation and translation.
+- [ ] Add explicit degraded modes for unavailable or stale data, retrieval, and model services.
+- [ ] Consolidate duplicated RAG implementation and document locations.
+- [ ] Add unit, integration, contract, failure, and AI-evaluation tests.
+- [ ] Add continuous integration.
+- [ ] Add structured logging, latency metrics, and dependency-health reporting.
+- [ ] Add a license, contribution guide, code of conduct, ownership statement, and privacy documentation.
+- [ ] Evaluate Ollama and LocalAI through a provider-independent model interface.
+- [ ] Integrate a real messaging provider after the simulated workflow is safe and reproducible.
+- [ ] Evaluate CoffeeAGNTCY/App SDK after the standalone architecture is stable.
+- [ ] Prepare the project for Digital Public Goods assessment.
 
 ## Troubleshooting
 
-**Backend container restart-looping**
-- `make logs` — check stack trace
-- Most common: missing env key in `backend/.env`
-- Kafka not yet healthy — wait 30s and retry
+### Container-name conflict
 
-**Recommendation agent restarting**
-- Needs `OPENAI_API_KEY`
-- `make logs-recommendation` to confirm
-
-**Frontend can't reach backend**
-- Confirm backend up: `curl http://localhost:8000/health`
-- Check `NEXT_PUBLIC_API_URL` — restart `npm run dev` after changing
-- Browser devtools → Network tab → check actual URL hit
-
-**CORS error in browser**
-- Backend `CORS_ORIGINS` env defaults to `http://localhost:3000`
-- If frontend on different origin, edit `backend/docker-compose.yml` `CORS_ORIGINS`, then `make down && make up`
-
-**`make ingest` fails**
-- Pinecone index must exist with name matching `PINECONE_INDEX_NAME`
-- Create at https://app.pinecone.io with embedding dimension matching the OpenAI embedding model used
-
-**Port already in use**
-- 8000, 8001, 9092, 3000 must be free
-- `lsof -i :8000` to find offender
-- Kill with `kill <pid>` or change port mapping in `docker-compose.yml`
-
-**Nothing in Kafka topics**
-- Producers seed from `app/data/*.json` on startup
-- `make logs-calfire` / `make logs-noaa` to confirm replay
-- `make clean && make up-build` to fully reset
-
-**SQLite stale data**
-- `make clean` (wipes volume) then `make up-build`
-- Local dev: delete `backend/app/data/firelink.db` and restart the producers
-
-**Host process can't reach Kafka (local dev)**
-- `make dev-infra` must be up — `docker compose ps` should show kafka healthy
-- Host processes must use `localhost:29092` (`KAFKA_BOOTSTRAP` in `backend/.env`) — `kafka:9092` and `localhost:9092` are container-only
-
-**`unable to open database file` (local dev)**
-- `DATABASE_URL` is CWD-relative — run `make dev-*` targets from `backend/`, not the repo root
-
----
-
-## Production build (frontend)
+If Docker reports that a `firelink-*` container name is already in use, identify the old Compose project:
 
 ```bash
-cd frontend
-npm run build
-npm run start    # http://localhost:3000
+docker inspect \
+  --format '{{ index .Config.Labels "com.docker.compose.project" }}' \
+  firelink-zookeeper
 ```
 
-Set `NEXT_PUBLIC_API_URL` in environment before `npm run build` — Next.js bakes public env at build time.
+Then stop that project without deleting its volumes:
 
----
+```bash
+docker compose -p <project-name> down
+```
 
-## Security checklist before pushing to git
+### Backend is not running
 
-- [ ] `backend/.env` is in `.gitignore` (already is — `git check-ignore backend/.env` should print the path)
-- [ ] No keys hardcoded in source (`git grep -E 'sk-(proj|ant)-|pcsk-'` returns nothing)
-- [ ] Rotate any key that ever touched a public commit, no exceptions
-- [ ] `ssh-key-2026-05-09.key.pub` is a public key — safe to commit, but private counterpart must never be
+Inspect container status and logs:
 
----
+```bash
+docker compose ps -a
+docker compose logs --tail=100 backend kafka zookeeper
+```
 
-## Component docs
+If Python dependencies are missing, confirm `openai` and `anthropic` are listed in `backend/requirements.txt`, then rebuild:
 
-- `backend/README.md` — service-by-service architecture, Kafka topics, agent internals
-- `frontend/README.md` — Next.js app routes, dashboard wiring
-- `docs/architecture-breakdown.md` — full-stack overview (backend endpoints/agents + frontend routes/structure)
-- `docs/streaming-pipeline.md` — real-time data pipeline: data sources, Kafka internals, context retrieval
-- `backend/docs/` — wildfire knowledge PDFs ingested into Pinecone
+```bash
+docker compose build --no-cache backend recommendation-agent
+docker compose up -d
+```
+
+### Frontend cannot reach the backend
+
+1. Confirm `make health` succeeds from `backend/`.
+2. Confirm `NEXT_PUBLIC_API_URL` points to `http://localhost:8000` unless intentionally overridden.
+3. Restart `npm run dev` after changing frontend environment variables.
+
+### Kafka has no messages
+
+```bash
+make logs-calfire
+make logs-noaa
+make topics
+```
+
+### Stop the project
+
+```bash
+cd backend
+make down
+```
+
+`make down` preserves volumes. `make clean` removes project volumes and should be used cautiously.
+
+## Contributing
+
+FireLink is transitioning into an open-source project. Until formal contribution guidelines are added:
+
+1. Open or select a focused GitHub issue.
+2. Create a feature branch from `main`.
+3. Keep changes small and document architectural decisions.
+4. Add or update tests for behavioral changes.
+5. Open a pull request explaining what changed, why, how it was tested, and any known limitations.
+
+Do not commit credentials, personal information, or claims that simulated information or actions are official or live.
+
+## Documentation
+
+- [`backend/README.md`](backend/README.md) — backend setup, services, commands, and troubleshooting
+- [`frontend/README.md`](frontend/README.md) — frontend setup and routes
+- [`docs/architecture-breakdown.md`](docs/architecture-breakdown.md) — current full-stack architecture
+- [`docs/streaming-pipeline.md`](docs/streaming-pipeline.md) — Kafka pipeline and context retrieval
+
+**Thank you for checking out our project!!!**
