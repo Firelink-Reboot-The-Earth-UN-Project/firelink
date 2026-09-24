@@ -1,20 +1,52 @@
-# FireLink - Wildfire Evacuation Intelligence Platform
+# FireLink - A SMS-first wildfire communication and community-intelligence platform
+Firelink explores how communities can access guidance for wildfire coordination when connectivity, device access, or emergency information systems are constrained. Our project combines a simulated SMS experience, a web dashboard, replayed wildfire and weather records, retrieval-assisted guidance, and an event-streaming backend. Out goal is to provide guidance and foster community understanding during urgent situations. 
 
-## 🚨 Quick Start (5 minutes)
+## Project Background Information
+FireLink began at the 2026 United Nations–UC San Diego(UCSD) Reboot the Earth Hackathon, where the original project received first place. It is now being developed from a hackathon prototype into a maintainable open-source MVP and systems-research platform.
+
+## Team Overview
+
+This is a **24-hour hackathon MVP** for a wildfire evacuation intelligence platform. The project is split into **Backend** and **Frontend** teams.
+
+Note: This is an ongoing project development. Currently, it replays historical and stimuted data, does not contact emergency services, and must not be relied upon for evacuation orders or immediate safety decisions. 
+
+## Project Objectives
+- Provide a low-barrier, SMS-oriented interface for wildfire information.
+- Present concise, localized, and multilingual guidance.
+- Preserve the source, timestamp, and simulation status of operational data.
+- Continue operating in defined degraded modes when optional AI services fail.
+- Explore resilient communication, distributed systems, local AI, and agent interoperability without making them requirements for the core MVP.
+- Develop toward open-source and Digital Public Goods best practices.
+
+# Getting Started
 
 **Make sure both backend AND frontend are running for the app to work!**
+
+### Requirements
+- Docker Desktop with Docker Compose v2
+- Node.js 20 or newer with npm
+- Python 3.10 or newer for host-side utilities
+- Make
+### Configure the backend
+Create backend/.env and provide the credentials required by the current hosted implementation:
+```
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+PINECONE_API_KEY=
+PINECONE_INDEX_NAME=
+```
+Note: Never commit .env or API credentials.
 
 ### Terminal 1: Start Backend
 
 ```bash
-cd firelink/backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cd backend
+make check
+make up-build
 ```
+Note: The first build may take several minutes while Docker downloads images and installs dependencies.
 
-✅ Backend ready: http://localhost:8000/docs
+Backend ready: http://localhost:8000/docs
 
 ### Terminal 2: Start Frontend
 
@@ -24,66 +56,7 @@ npm install
 npm start
 ```
 
-✅ Frontend ready: http://localhost:3000
-
----
-
-## 📋 Team Overview
-
-This is a **24-hour hackathon MVP** for a wildfire evacuation intelligence platform. The project is split into **Backend** and **Frontend** teams.
-
-### What is FireLink?
-
-FireLink helps communities respond to wildfires by:
-
-- **Real-time incident reporting** - Users report fires, blocked roads, smoke, etc.
-- **Risk scoring** - Computes evacuation danger based on hazard proximity
-- **Smart routing** - Calculates safest evacuation routes to shelters
-- **Interactive visualization** - Shows all hazards and routes on a live map
-
----
-
-## 👥 Team Structure
-
-### 🔧 Backend Team (Python/FastAPI)
-
-**Focus**: API endpoints, risk engine, routing logic, database
-
-**Key Files**:
-
-- `firelink/backend/app/main.py` - Main API app
-- `firelink/backend/app/services/risk_engine.py` - Risk scoring algorithm
-- `firelink/backend/app/services/routing_engine.py` - Route computation
-- `firelink/backend/app/routers/` - API endpoints
-
-**Responsibilities**:
-
-- Implement risk scoring algorithm improvements
-- Add real OSM routing (replace mock routes)
-- Add WebSocket support for live updates
-- Connect to real fire/hazard data sources
-- Performance optimization
-
-**API Docs**: http://localhost:8000/docs (Swagger UI)
-
-### 🎨 Frontend Team (React/TypeScript)
-
-**Focus**: UI/UX, map visualization, user interactions
-
-**Key Files**:
-
-- `firelink/frontend/src/components/` - React components
-- `firelink/frontend/src/api/client.ts` - Backend communication
-- `firelink/frontend/src/App.tsx` - Main app logic
-
-**Responsibilities**:
-
-- Improve map styling and interactivity
-- Add animations and transitions
-- Enhance form UX and validation
-- Add real-time updates with WebSockets
-- Responsive design for mobile
-- Accessibility improvements
+Frontend ready: http://localhost:3000
 
 ---
 
@@ -91,39 +64,44 @@ FireLink helps communities respond to wildfires by:
 
 ```
 firelink/
-├── README.md                 ← Main project guide
-├── .gitignore
-├── backend/                  ← Python/FastAPI backend
-│   ├── README.md            ← Backend setup & API docs
-│   ├── requirements.txt      ← Python dependencies
-│   └── app/
-│       ├── main.py          ← FastAPI app
-│       ├── models.py        ← Database models
-│       ├── schemas.py       ← Pydantic schemas
-│       ├── database.py      ← DB configuration
-│       ├── routers/         ← API endpoints
-│       │   ├── reports.py
-│       │   ├── routing.py
-│       │   ├── risk.py
-│       │   └── layers.py
-│       ├── services/        ← Business logic
-│       │   ├── risk_engine.py
-│       │   ├── routing_engine.py
-│       │   └── data_loader.py
-│       └── seed/            ← Initial data
-│           ├── shelters.json
-│           ├── fire_points.json
-│           └── mock_reports.json
-└── frontend/                 ← React/TypeScript frontend
-    ├── README.md            ← Frontend setup & guide
-    ├── package.json         ← Node dependencies
-    ├── public/
-    │   └── index.html
-    └── src/
-        ├── App.tsx          ← Main component
-        ├── components/      ← React components
-        ├── api/             ← Backend client
-        └── types/           ← TypeScript types
+├── README.md                       # Project overview and quick start
+├── backend/
+│   ├── app/
+│   │   ├── main.py                 # FastAPI application entry point
+│   │   ├── core/                   # Database and Kafka configuration
+│   │   ├── data/                   # Replay, community and mock data
+│   │   ├── models/                 # SQLAlchemy database models
+│   │   ├── schemas/                # Pydantic request and response models
+│   │   ├── repository/             # Database access layer
+│   │   ├── routes/                 # REST and simulated-SMS endpoints
+│   │   ├── services/
+│   │   │   ├── agents/             # Help and recommendation agents
+│   │   │   ├── knowledge/          # RAG ingestion and retrieval
+│   │   │   ├── producers/          # Fire and weather Kafka producers
+│   │   │   ├── context_service.py  # Kafka context retrieval
+│   │   │   ├── community_service.py
+│   │   │   └── dispatch_service.py # Mock dispatch behavior
+│   │   ├── mcp_server.py           # Experimental MCP interface
+│   │   ├── run_agent.py
+│   │   └── run_producer.py
+│   ├── docs/                       # Preparedness documents for RAG
+│   ├── test/                       # Smoke test and SMS CLI
+│   ├── docker-compose.yml          # Local service orchestration
+│   ├── Dockerfile
+│   ├── Dockerfile.mcp
+│   ├── Makefile
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── app/                    # Next.js routes and ZIP dashboards
+│   │   ├── components/             # Dashboard, fire, resource and chat UI
+│   │   ├── lib/                    # API client, types and data adapters
+│   │   └── data/                   # Frontend demonstration data
+│   ├── package.json
+│   └── README.md
+└── docs/
+    ├── architecture-breakdown.md   # Current full-stack architecture
+    └── streaming-pipeline.md       # Kafka and data-flow documentation
 ```
 
 ---
@@ -203,52 +181,6 @@ Future improvements:
 
 **Location**: `firelink/backend/app/services/routing_engine.py`
 
-### Frontend Map
-
-Built with **Leaflet.js** displaying:
-
-- Shelter markers (blue)
-- Incident reports (colored by type)
-- Risk heatmap (red overlay)
-- Evacuation routes (green line)
-- User's selected location (green)
-
-**Location**: `firelink/frontend/src/components/MapView.tsx`
-
----
-
-## 🔄 Development Workflow
-
-### 1. Backend Development
-
-```bash
-cd firelink/backend
-source venv/bin/activate
-python -m uvicorn app.main:app --reload
-```
-
-- Edit files in `app/`
-- Server auto-reloads on changes
-- Check http://localhost:8000/docs for API testing
-
-### 2. Frontend Development
-
-```bash
-cd firelink/frontend
-npm start
-```
-
-- Edit files in `src/`
-- Browser auto-reloads on changes
-- Check console for errors
-
-### 3. Testing Changes
-
-1. Backend makes changes → test in Swagger UI
-2. Frontend makes changes → see live in browser
-3. Both communicate via HTTP → check network tab
-
----
 
 ## 🐛 Common Issues & Fixes
 
@@ -294,33 +226,19 @@ The database auto-seeds on first run with:
 
 ---
 
-## 🚀 Next Steps
+## Project Roadmao
 
 ### For Backend Team
 
-1. [ ] Improve risk scoring algorithm
-2. [ ] Add NetworkX/OSMnx for real routing
-3. [ ] Add WebSocket support for live updates
-4. [ ] Integrate real fire data (USGS/CalFire API)
-5. [ ] Add authentication & user roles
-6. [ ] Database indexing & optimization
-
-### For Frontend Team
-
-1. [ ] Enhance map styling & markers
-2. [ ] Add animations & transitions
-3. [ ] Improve form validation & UX
-4. [ ] Add WebSocket integration
-5. [ ] Responsive mobile design
-6. [ ] Dark mode support
-
-### For DevOps
-
-1. [ ] Docker setup (backend + frontend)
-2. [ ] CI/CD pipeline (GitHub Actions)
-3. [ ] Deployment (AWS/Azure/Heroku)
-4. [ ] Environment configuration
-5. [ ] Database migration scripts
+1. [ ] Define versioned event schemas with source, timestamp, freshness, verification, and simulation metadata
+2. [ ] Build a persistent current-state service so user requests do not create Kafka consumers
+3. [ ] Separate deterministic safety rules from AI explanation and translation
+4. [ ] Add explicit degraded modes for unavailable or stale data, retrieval, and model services
+5. [ ] Add unit, integration, contract, and failure tests with continuous integration
+6. [ ] Evaluate Ollama and LocalAI behind a provider-independent interface
+7. [ ] Integrate a real messaging provider only after the simulated workflow is safe and reproducible
+8. [ ] Evaluate CoffeeAGNTCY/App SDK integration after the standalone core architecture is stable
+9. [ ] Prepare licensing, ownership, privacy, documentation, and do-no-harm materials for Digital Public Goods assessment
 
 ---
 
@@ -387,7 +305,3 @@ Check the relevant README:
 - **Backend issues**: See `firelink/backend/README.md`
 - **Frontend issues**: See `firelink/frontend/README.md`
 - **Overall project**: See `firelink/README.md`
-
----
-
-**Built for emergency response. Let's save lives! 🚀**
