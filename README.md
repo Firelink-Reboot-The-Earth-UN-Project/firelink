@@ -47,43 +47,12 @@ FireLink is an **MVP prototype under architectural revision**. The current repos
 
 The current implementation is not yet offline, connected to a real SMS provider, or backed by a live authoritative emergency feed.
 
-## Architecture
-
-### Current implementation
-
-```mermaid
-flowchart LR
-    D["Historical fire and weather records"] --> P["Replay producers"]
-    P --> K["Kafka topics"]
-    K --> C["Context service"]
-    C --> R["Recommendation agent"]
-    R --> K
-    C --> H["Help Agent"]
-    G["Preparedness RAG"] --> H
-    H --> A["FastAPI"]
-    C --> A
-    A --> U["Next.js dashboard / SMS simulator"]
-```
-
-This diagram describes the current implementation, not the final target architecture. The current request path is being reviewed to reduce direct dependencies on Kafka and hosted AI services.
 
 For more detail, see:
 
 - [`docs/architecture-breakdown.md`](docs/architecture-breakdown.md)
 - [`docs/streaming-pipeline.md`](docs/streaming-pipeline.md)
 
-## Technology stack
-
-| Area | Current technology |
-| --- | --- |
-| Frontend | Next.js, TypeScript, Tailwind CSS, Leaflet, Recharts |
-| API | Python, FastAPI, Pydantic, SQLAlchemy |
-| Event streaming | Apache Kafka with ZooKeeper |
-| Persistence | SQLite |
-| AI | OpenAI recommendation agent and Anthropic Help Agent |
-| Retrieval | Pinecone with OpenAI embeddings |
-| Interoperability experiment | FastMCP |
-| Local orchestration | Docker Compose and Make |
 
 Hosted AI and retrieval services are current implementation choices, not permanent architectural requirements. Ollama and LocalAI are being evaluated as local alternatives.
 
