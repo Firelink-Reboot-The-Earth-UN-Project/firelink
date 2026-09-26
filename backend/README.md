@@ -1,10 +1,14 @@
 # FireLink Backend
 
-Real-time wildfire evacuation pipeline. Kafka streams CAL FIRE + weather data,
+Real time, AI-driven wildfire communication pipeline. Kafka streams CAL FIRE + weather data,
 SQLite caches it, an OpenAI agent emits advisories every 60s, and a multilingual
 **Help Agent** answers simulated SMS by blending RAG knowledge (Pinecone PDFs),
 live fire/weather context, the latest official advisory, and an LA-area shelter
-list — all in a single Claude call.
+list.
+
+This document and backend implementation are evolving, but below you can find info on backend infra, run guide, local development mode, file layout, and troubleshooting steps.
+
+For a more in depth breakdown of the architecture and how the streaming pipeline works, check out the `/docs` directory under the repo root.
 
 ## Stack
 
@@ -64,15 +68,10 @@ own config):
     KAFKA_BOOTSTRAP=localhost:29092
     DATABASE_URL=sqlite:///app/data/firelink.db
 
-Run everything from `backend/` — the SQLite path is CWD-relative (DB lands at
-`app/data/firelink.db`, re-seeded by producers on startup). `make dev-down`
-stops all containers in the compose project. See the repo README for the
-full guide.
-
 Notes:
 
 - Host processes reach Kafka on `localhost:29092` — a HOST listener added by `docker-compose.dev.yml`; the base file's `kafka:9092` stays container-internal, so teammates running `make up` are unaffected.
-- `DATABASE_URL` is CWD-relative: run from `backend/` and the DB lands at `backend/app/data/firelink.db` (gitignored, re-seeded by the producers on startup).
+- `DATABASE_URL` (SQLite Path) is CWD-relative: run from `backend/` and the DB lands at `backend/app/data/firelink.db` (gitignored, re-seeded by the producers on startup).
 - `make dev-down` stops **all** containers in the compose project — run `make down` first when switching from a full-stack session.
 
 ---
