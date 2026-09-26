@@ -87,15 +87,32 @@ cd firelink
 Create `backend/.env` with the credentials required by the current hosted implementation:
 
 ```env
-OPENAI_API_KEY=
-ANTHROPIC_API_KEY=
-PINECONE_API_KEY=
-PINECONE_INDEX_NAME=
+OPENAI_API_KEY=sk-proj-...
+PINECONE_API_KEY=pcsk-...
+PINECONE_INDEX_NAME=rte-wildfire-data
 ```
+
+Where each is used:
+
+- `OPENAI_API_KEY` — chat models (hosted OpenAI, see below) + Pinecone embeddings during ingest
+- `PINECONE_API_KEY` + `PINECONE_INDEX_NAME` — RAG vector store for wildfire knowledge PDFs
 
 Note: Never commit `.env` or API credentials.
 
+Optional — run the chat models on a local, open-source stack instead of hosted
+OpenAI (any OpenAI-compatible server: Ollama, vLLM, LM Studio, llama.cpp):
+
+```env
+OPENAI_BASE_URL=http://localhost:11434/v1   # Ollama (host.docker.internal:11434/v1 in full docker-compose)
+HELP_MODEL=qwen3.5:27b                       # Help Agent (default gpt-4o)
+RECOMMENDATION_MODEL=qwen3.5:27b             # Recommendation Agent (default gpt-4o-mini)
+```
+
+See "Local / open-source models" in `docs/architecture-breakdown.md` for details.
+
 ### 3. Start the backend stack
+
+Run from project root:
 
 ```bash
 cd backend
@@ -139,6 +156,10 @@ make test
 ```
 
 The smoke test checks the containers, Kafka topics, REST endpoints, credentials, and simulated SMS pipeline.
+
+### Local Development Mode Setup
+
+The above setup instructions are good for first time setup and for full application builds. If you are actively helping develop the backend, see `Local development (hybrid)` under `backend/README.md` which contains instructions for a faster development workflow without having to build and run all containers each time.
 
 ## Service URLs
 

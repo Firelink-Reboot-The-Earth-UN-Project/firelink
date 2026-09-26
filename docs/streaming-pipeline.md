@@ -106,6 +106,10 @@ bridge, started via `make up-build`. Producers and backend connect to Kafka
 at `kafka:9092` (internal DNS). See `backend/docker-compose.yml` for the full
 config (build context, healthchecks, env vars, volumes).
 
+For local backend development, `docker-compose.dev.yml` layers a host listener
+onto the broker so only zookeeper + kafka need to run in Docker — see the repo
+README's "Local backend development" section.
+
 | Container | Purpose | Port | Depends on |
 |---|---|---|---|
 | `firelink-zookeeper` | Kafka coordinator | — | — |
@@ -114,7 +118,7 @@ config (build context, healthchecks, env vars, volumes).
 | `firelink-calfire-producer` | Replays `fire_incidents.json` → `firelink.fire` every 10s | — | kafka (healthy) |
 | `firelink-noaa-producer` | Replays `weather_alerts.json` → `firelink.weather` every 10s | — | kafka (healthy) |
 | `firelink-mcp-server` | FastMCP server exposing `get_context` / `notify_dispatch` tools | `8001` | kafka (healthy) |
-| `firelink-recommendation-agent` | Emits advisory to `firelink.recommendations` every 60s via gpt-4o-mini | — | kafka (healthy) |
+| `firelink-recommendation-agent` | Emits advisory to `firelink.recommendations` every 60s via the configured chat model (default `gpt-4o-mini`, see "Local models" in architecture-breakdown.md) | — | kafka (healthy) |
 
 ---
 
@@ -133,6 +137,7 @@ app/
       calfire_producer.py       ← fire_incidents.json replay → firelink.fire (10s)
       noaa_producer.py          ← weather_alerts.json replay → firelink.weather (10s)
     context_service.py          ← reads last 10 msgs per topic, 10s timeout, returns snapshot
+    llm.py                      ← single chat-completions client: hosted OpenAI (default) or any OpenAI-compatible server via OPENAI_BASE_URL
   routes/
     context.py                  ← GET /context/latest
   data/
@@ -282,7 +287,7 @@ response. By always reading the tail of the Kafka log, the agent gets a
 **fresh, time-ordered snapshot** of the 10 most recent fire incidents and
 weather alerts — never stale data, never the full 199-message history.
 
-This snapshot is serialized into the Claude prompt alongside RAG chunks, user
+This snapshot is serialized into the LLM prompt alongside RAG chunks, user
 profile, shelter data, and the latest advisory, grounding the LLM's response
 in current conditions.
 
@@ -318,7 +323,7 @@ window for a given replay position.
 | Setting | Value | Location |
 |---|---|---|
 | Bootstrap server (in-container) | `kafka:9092` | `docker-compose.yml`, `app/core/kafka.py` |
-| Bootstrap server (host-side) | `localhost:9092` | `docker-compose.yml` port mapping |
+| Bootstrap server (host-side, local dev) | `localhost:29092` | `docker-compose.dev.yml` HOST listener, `KAFKA_BOOTSTRAP` in `backend/.env` |
 | Messages read per topic | 10 | `MESSAGES_PER_TOPIC` in `context_service.py` |
 | Overall context fetch timeout | 10s | `asyncio.wait_for` in `get_latest_context()` |
 | Per-message read timeout | 2s | `asyncio.wait_for` in `_read_latest()` |

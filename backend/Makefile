@@ -7,11 +7,17 @@ FRONTEND_DIR := ../frontend
 NPM_BIN ?= $(shell command -v npm 2>/dev/null)
 NPM := $(NPM_BIN) --prefix $(FRONTEND_DIR)
 
+VENV := .venv
+PY := $(VENV)/bin/python
+UVICORN := $(VENV)/bin/uvicorn
+DEV_COMPOSE := docker compose -f docker-compose.yml -f docker-compose.dev.yml
+
 .PHONY: help check up up-build down clean logs ps health \
         logs-calfire logs-noaa logs-all logs-mcp logs-recommendation \
         stream-fire stream-weather stream-recommendations \
-        context topics mcp-server ingest sms sms-replay test \
-        check-npm frontend-install frontend-dev frontend-build frontend-start frontend-lint
+        context topics mcp-server ingest sms sms-replay test unit \
+        check-npm frontend-install frontend-dev frontend-build frontend-start frontend-lint \
+        check-venv dev-venv dev-infra dev-down dev-api dev-calfire dev-noaa dev-recommendation
 
 help:
 	@echo "Available targets:"
@@ -40,12 +46,22 @@ help:
 	@echo "  make sms                 Interactive SMS simulator (talks to /sms/inbound)"
 	@echo "  make sms-replay          Batch-replay sms_test_cases.json through the Help Agent"
 	@echo "  make test                Smoke-test running stack (make + REST + Help Agent)"
+	@echo "  make unit                Run llm.py unit tests (pytest; no stack needed)"
 	@echo ""
 	@echo "  make frontend-install    Install Next.js dependencies (npm install)"
 	@echo "  make frontend-dev        Run Next.js dev server (port 3000)"
 	@echo "  make frontend-build      Production build of the Next.js app"
 	@echo "  make frontend-start      Run the production Next.js server"
 	@echo "  make frontend-lint       Run eslint on the frontend"
+	@echo ""
+	@echo "Local development (Docker infra + host venv):"
+	@echo "  make dev-venv            Create backend/.venv and install requirements.txt"
+	@echo "  make dev-infra           Start zookeeper + kafka only (host listener :29092)"
+	@echo "  make dev-down            Stop Docker infra"
+	@echo "  make dev-api             Run FastAPI locally with uvicorn --reload (:8000)"
+	@echo "  make dev-calfire         Run CAL FIRE producer locally"
+	@echo "  make dev-noaa            Run NOAA producer locally"
+	@echo "  make dev-recommendation  Run recommendation agent locally"
 
 check:
 	@command -v docker >/dev/null 2>&1 || { echo "Docker is not installed or not on PATH."; exit 1; }
@@ -114,9 +130,9 @@ topics:
 		--bootstrap-server localhost:9092 \
 		--list
 
-mcp-server:
-	@python3 -c "import fastmcp" 2>/dev/null || pip3 install -r requirements-mcp.txt
-	KAFKA_BOOTSTRAP=localhost:9092 python3 -m app.mcp_server
+mcp-server: check-venv
+	$(VENV)/bin/pip show fastmcp >/dev/null 2>&1 || $(VENV)/bin/pip install -r requirements-mcp.txt
+	$(PY) -m app.mcp_server
 
 ingest:
 	$(COMPOSE) exec backend python -m app.services.knowledge.ingest
@@ -129,6 +145,10 @@ sms-replay:
 
 test:
 	@python3 test/smoke_test.py
+
+unit: check-venv
+	$(VENV)/bin/pip show pytest >/dev/null 2>&1 || $(VENV)/bin/pip install -r requirements-dev.txt
+	$(PY) -m pytest test/test_llm.py -v
 
 check-npm:
 	@test -n "$(NPM_BIN)" || { echo "npm not found on PATH. Run 'nvm use' (or otherwise ensure npm is on PATH) before using frontend-* targets, or override: make frontend-dev NPM_BIN=/path/to/npm"; exit 1; }
@@ -149,3 +169,30 @@ frontend-start: check-npm
 
 frontend-lint: check-npm
 	$(NPM) run lint
+
+check-venv:
+	@test -x $(PY) || { echo "backend/.venv not found. Run 'make dev-venv' first."; exit 1; }
+
+# Local development (Docker infra + host venv)
+dev-venv:
+	python3 -m venv $(VENV)
+	$(VENV)/bin/pip install --upgrade pip
+	$(VENV)/bin/pip install -r requirements.txt
+
+dev-infra:
+	$(DEV_COMPOSE) up -d --wait zookeeper kafka
+
+dev-down:
+	$(DEV_COMPOSE) down
+
+dev-api: check-venv
+	$(UVICORN) app.main:app --host 0.0.0.0 --port 8000 --reload
+
+dev-calfire: check-venv
+	$(PY) -m app.run_producer calfire
+
+dev-noaa: check-venv
+	$(PY) -m app.run_producer noaa
+
+dev-recommendation: check-venv
+	$(PY) -m app.run_agent recommendation

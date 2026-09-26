@@ -1,17 +1,8 @@
 """
 rag_query.py
 ------------
-Called every time a user sends an SMS to FireLink.
-Takes the user's phone number + message, retrieves relevant fire
-knowledge from Pinecone, injects their profile from mock_users.json,
-and returns a Claude-generated SMS response.
-
-Usage (standalone test):
-    python -m app.services.knowledge.rag_query
-
-Designed to be imported by the FastAPI route or a Twilio SMS webhook:
-    from app.services.knowledge.rag_query import query_agent
-    response = query_agent(phone_number="+16195550001", user_message="There's smoke outside")
+Retrieval helpers for the Help Agent: loads mock user profiles from
+mock_users.json and retrieves relevant fire-knowledge chunks from Pinecone.
 """
 
 import os
@@ -21,7 +12,6 @@ from dotenv import load_dotenv
 
 from langchain_openai import OpenAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
-import anthropic
 
 load_dotenv()
 
@@ -95,85 +85,3 @@ def retrieve_chunks(user_message: str) -> list[str]:
     results = vector_store.similarity_search(user_message, k=TOP_K)
     return [doc.page_content for doc in results]
 
-
-def build_prompt(user_profile_str: str, chunks: list[str], user_message: str) -> str:
-    chunks_text = "\n\n".join(
-        f"[Source {i+1}]:\n{chunk}" for i, chunk in enumerate(chunks)
-    )
-
-    return f"""You are FireLink, a calm emergency wildfire assistant responding via SMS.
-Only use the information provided below to answer. Do not add information not present here.
-If you cannot answer from the provided knowledge, say: "I don't have specific guidance for that. Please call 911 if you are in immediate danger."
-
-USER PROFILE:
-{user_profile_str}
-
-RELEVANT KNOWLEDGE:
-{chunks_text}
-
-USER MESSAGE:
-"{user_message}"
-
-Respond in 1-3 short sentences. Be direct, calm, and actionable. No bullet points — this is an SMS."""
-
-
-def call_claude(prompt: str) -> str:
-    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-
-    message = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=300,
-        messages=[
-            {"role": "user", "content": prompt}
-        ],
-    )
-
-    return message.content[0].text
-
-
-def query_agent(phone_number: str, user_message: str) -> str:
-    """
-    Full RAG pipeline for one incoming SMS.
-
-    Args:
-        phone_number: E.164 format e.g. "+16195550001"
-        user_message: raw text the user sent
-
-    Returns:
-        SMS response string from Claude
-    """
-    users = load_mock_users()
-    profile = users.get(phone_number)
-
-    if profile:
-        user_profile_str = serialize_user_profile(profile)
-    else:
-        user_profile_str = "User profile unknown. No personalization available."
-
-    chunks = retrieve_chunks(user_message)
-    prompt = build_prompt(user_profile_str, chunks, user_message)
-    return call_claude(prompt)
-
-
-def load_test_cases() -> list[dict]:
-    if not TEST_CASES_PATH.exists():
-        raise FileNotFoundError(
-            f"rag_test_cases.json not found at {TEST_CASES_PATH}."
-        )
-    with open(TEST_CASES_PATH, "r") as f:
-        return json.load(f)
-
-
-if __name__ == "__main__":
-    test_cases = load_test_cases()
-
-    for test in test_cases:
-        print(f"\n{'='*50}")
-        print(f"Phone:   {test['phone']}")
-        print(f"Message: {test['message']}")
-        print(f"{'='*50}")
-        response = query_agent(
-            phone_number=test["phone"],
-            user_message=test["message"],
-        )
-        print(f"FireLink: {response}")

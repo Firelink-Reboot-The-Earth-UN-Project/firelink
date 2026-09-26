@@ -3,7 +3,7 @@ import json
 import logging
 import os
 
-from openai import AsyncOpenAI
+from app.services.llm import complete_json, get_client
 
 logger = logging.getLogger(__name__)
 
@@ -29,36 +29,18 @@ Respond ONLY with this JSON object (no markdown, no extra text):
 
 
 class BaseAgent:
-    model = "gpt-4o-mini"
+    model = os.getenv("RECOMMENDATION_MODEL") or "gpt-4o-mini"
 
     def __init__(self):
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise RuntimeError(
-                "OPENAI_API_KEY is not set. Add it to backend/.env or export it in your shell."
-            )
-        self.client = AsyncOpenAI(api_key=api_key)
+        # validate provider config early so misconfiguration fails at startup
+        get_client()
 
     async def call_llm(self, context: dict) -> dict:
-        response = await self.client.chat.completions.create(
+        return await complete_json(
             model=self.model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": json.dumps(context)},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.3,
+            system=SYSTEM_PROMPT,
+            user=json.dumps(context),
         )
-        raw = response.choices[0].message.content
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            # strip possible markdown fences
-            import re
-            match = re.search(r"\{.*\}", raw, re.DOTALL)
-            if match:
-                return json.loads(match.group())
-            raise
 
     async def _connect_producer(self):
         from aiokafka import AIOKafkaProducer

@@ -1,10 +1,14 @@
 # FireLink Backend
 
-Real-time wildfire evacuation pipeline. Kafka streams CAL FIRE + weather data,
+Real time, AI-driven wildfire communication pipeline. Kafka streams CAL FIRE + weather data,
 SQLite caches it, an OpenAI agent emits advisories every 60s, and a multilingual
 **Help Agent** answers simulated SMS by blending RAG knowledge (Pinecone PDFs),
 live fire/weather context, the latest official advisory, and an LA-area shelter
-list — all in a single Claude call.
+list.
+
+This document and backend implementation are evolving, but below you can find info on backend infra, run guide, local development mode, file layout, and troubleshooting steps.
+
+For a more in depth breakdown of the architecture and how the streaming pipeline works, check out the `/docs` directory under the repo root.
 
 ## Stack
 
@@ -20,10 +24,13 @@ list — all in a single Claude call.
 | `firelink-recommendation-agent` | — | OpenAI `gpt-4o-mini`, every 60s |
 | `firelink-mcp-server` | 8001 | FastMCP `get_context` tool |
 
+In local dev mode only zookeeper + kafka run in Docker; the Python services
+run on the host from `backend/.venv` — see "Local development" below.
+
 ## Prerequisites
 
-- Docker Desktop running
-- `.env` at repo root with these keys:
+- Docker Desktop running (full stack, or Kafka-only in local dev mode)
+- `backend/.env` with these keys:
 
       OPENAI_API_KEY=...         # recommendation-agent + Pinecone embeddings
       ANTHROPIC_API_KEY=...      # Help Agent (Claude SMS reply)
@@ -41,6 +48,33 @@ list — all in a single Claude call.
 
 `make test` exits 0 if everything passes, 1 if anything fails. Per-check
 PASS/FAIL lines tell you what broke.
+
+## Local development (hybrid)
+
+Active backend development without rebuilding images: only zookeeper + kafka
+run in Docker (host listener `:29092` via `docker-compose.dev.yml`); the API,
+producers, and agent run on the host from `backend/.venv` with `uvicorn --reload`. Full-stack Docker (above) stays the default for demos and onboarding.
+
+    make dev-venv           # once (first time): create .venv + install requirements.txt
+    make dev-infra          # zookeeper + kafka only
+    make dev-api            # uvicorn --reload :8000
+    make dev-calfire        # when you need incident data flowing
+    make dev-noaa
+    make dev-recommendation
+
+Requires two extra lines in `backend/.env` (host-only; containers use their
+own config):
+
+    KAFKA_BOOTSTRAP=localhost:29092
+    DATABASE_URL=sqlite:///app/data/firelink.db
+
+Notes:
+
+- Host processes reach Kafka on `localhost:29092` — a HOST listener added by `docker-compose.dev.yml`; the base file's `kafka:9092` stays container-internal, so teammates running `make up` are unaffected.
+- `DATABASE_URL` (SQLite Path) is CWD-relative: run from `backend/` and the DB lands at `backend/app/data/firelink.db` (gitignored, re-seeded by the producers on startup).
+- `make dev-down` stops **all** containers in the compose project — run `make down` first when switching from a full-stack session.
+
+---
 
 ## What `make test` checks
 
@@ -136,6 +170,13 @@ ready. Wait for `make ps` to show `firelink-backend` as healthy, then rerun.
 **Kafka unhealthy / producers can't connect** — Kafka takes 15-30s to come up
 after `make up-build`. Watch `make logs-all` until you see
 `Kafka connected (attempt 1)` from the producers.
+
+**Host process can't reach Kafka (local dev)** — `make dev-infra` running and
+healthy? Host processes must use `localhost:29092` (`KAFKA_BOOTSTRAP` in
+`backend/.env`); `kafka:9092` and `localhost:9092` are container-only.
+
+**`unable to open database file` (local dev)** — run from `backend/`, not the
+repo root; `DATABASE_URL` is CWD-relative.
 
 ## Layout
 
